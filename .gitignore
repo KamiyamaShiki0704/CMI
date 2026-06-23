@@ -1,0 +1,22 @@
+.vs/
+bin/
+obj/
+
+# Build output created by the local packaging scripts.
+dist/dll/
+dist/mod/
+dist/run_cmi_nightreign.bat
+
+# Visual Studio / user-local files.
+*.user
+*.suo
+*.cache
+
+# Debug symbols and logs.
+*.pdb
+*.log
+
+# Local test music/configuration should not be committed.
+sound/
+sound.local.json
+CMI.config.json

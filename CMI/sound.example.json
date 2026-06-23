@@ -1,0 +1,28 @@
+{
+  "ExampleAlwaysActive": {
+    "SoundPath": "example.mp3",
+    "AlwaysActive": true,
+    "EventFlagId": null,
+    "Pointer1": "0x0",
+    "Pointer2": "0x0",
+    "Startbit": 0,
+    "Type": 4,
+    "FadeInSeconds": 0.0,
+    "FadeOutSeconds": 2.0,
+    "FadeIntoNextTrack": true,
+    "Loop": true
+  },
+  "ExampleNightreignFlag": {
+    "SoundPath": "nightreign-boss.mp3",
+    "AlwaysActive": false,
+    "EventFlagId": 0,
+    "Pointer1": "0x0",
+    "Pointer2": "0x0",
+    "Startbit": 0,
+    "Type": 4,
+    "FadeInSeconds": 1.0,
+    "FadeOutSeconds": 4.0,
+    "FadeIntoNextTrack": true,
+    "Loop": true
+  }
+}

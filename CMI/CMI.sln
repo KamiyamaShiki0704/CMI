@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.4.33103.184
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CMI.Nightreign", "CMI.csproj", "{7E7A8425-F3B5-4219-9D30-62B88E538D1B}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7E7A8425-F3B5-4219-9D30-62B88E538D1B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7E7A8425-F3B5-4219-9D30-62B88E538D1B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7E7A8425-F3B5-4219-9D30-62B88E538D1B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7E7A8425-F3B5-4219-9D30-62B88E538D1B}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {6C0ECDB4-10E3-4F4C-A31E-024353D160C0}
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,14 @@
+{
+  "ProcessName": "nightreign",
+  "DisplayName": "ELDEN RING NIGHTREIGN",
+  "SoundFolder": "sound",
+  "SoundJson": "sound.json",
+  "EventFlagIdReader": "NativeBridge",
+  "Memory": {
+    "EnableLegacySignatureScanning": false,
+    "EventFlagManQuery": null,
+    "GameDataManQuery": null,
+    "WorldChrManQuery": null,
+    "Notes": "Nightreign EventFlagId reads use the ME3 native flag bridge. Legacy Elden Ring signatures are disabled."
+  }
+}

@@ -1,0 +1,21 @@
+profileVersion = "v1"
+
+[[natives]]
+path = "SeamlessCoop/nrsc.dll"
+load_early = true
+
+[[natives]]
+path = "_mod/LilyHook.dll"
+
+[[natives]]
+path = "dll/nightreign_dps.dll"
+
+[[natives]]
+path = "dll/cmi_nightreign_loader.dll"
+
+[[packages]]
+id = "NR_Mod"
+source = "F:/SteamLibrary/steamapps/common/ELDEN RING NIGHTREIGN/Game/_mod"
+
+[[supports]]
+game = "nightrein"

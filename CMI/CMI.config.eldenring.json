@@ -1,0 +1,14 @@
+{
+  "ProcessName": "eldenring",
+  "DisplayName": "ELDEN RING",
+  "SoundFolder": "sound",
+  "SoundJson": "sound.json",
+  "EventFlagIdReader": "NativeBridge",
+  "Memory": {
+    "EnableLegacySignatureScanning": true,
+    "EventFlagManQuery": null,
+    "GameDataManQuery": null,
+    "WorldChrManQuery": null,
+    "Notes": "Original Elden Ring mode uses the native flag bridge for direct EventFlagId entries. Legacy CMI Pointer1/Pointer2/Startbit entries remain supported as a fallback. Copy this file as CMI.config.json next to the DLL."
+  }
+}

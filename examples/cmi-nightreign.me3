@@ -1,0 +1,7 @@
+profileVersion = "v1"
+
+[[natives]]
+path = "dll/cmi_nightreign_loader.dll"
+
+[[supports]]
+game = "nightrein"

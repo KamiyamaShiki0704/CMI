@@ -1,0 +1,7 @@
+profileVersion = "v1"
+
+[[natives]]
+path = "dll/cmi_eldenring_loader.dll"
+
+[[supports]]
+game = "eldenring"
