@@ -47,6 +47,7 @@ namespace CMI
         private static bool legacySignatureScanningEnabled;
         private static bool gameDataManLookupAvailable;
         private static bool nativeStarted;
+        private static int fatalExitStarted;
         private static readonly object nativeStartLock = new object();
         public static readonly List<SoundEvent> soundEvents = new List<SoundEvent>();
         private static readonly MediaPlayer musicMediaPlayer = new MediaPlayer(0, true, 0);
@@ -157,7 +158,26 @@ namespace CMI
 
         private static Process[] GetGameProcesses()
         {
-            return Process.GetProcessesByName(runtimeSettings.ProcessName);
+            try
+            {
+                return Process.GetProcessesByName(runtimeSettings.ProcessName);
+            }
+            catch
+            {
+                return Array.Empty<Process>();
+            }
+        }
+
+        private static bool IsGameProcessExited()
+        {
+            try
+            {
+                return mainGameProcess == null || mainGameProcess.HasExited;
+            }
+            catch
+            {
+                return true;
+            }
         }
 
         private static Scanner ConfigureMemoryScanner(string searchQuery)
@@ -281,12 +301,27 @@ namespace CMI
                 {
                     SendStatusLogMessage($"{runtimeSettings.DisplayName} is not currently running, waiting...");
                     await Task.Delay(2000);
+                    continue;
                 }
-                else break;
+
+                mainGameProcess = gameProcesses[0];
+                if (IsGameProcessExited())
+                {
+                    await Task.Delay(1000);
+                    continue;
+                }
+
+                gameProcessHandle = OpenProcess(0x00000010, false, mainGameProcess.Id);
+                if (gameProcessHandle == IntPtr.Zero)
+                {
+                    SendStatusLogMessage($"{runtimeSettings.DisplayName} is not attachable yet, retrying...");
+                    await Task.Delay(2000);
+                    continue;
+                }
+
+                break;
             }
             SendStatusLogMessage($"Attaching to {runtimeSettings.DisplayName}...");
-            mainGameProcess = gameProcesses[0];
-            gameProcessHandle = OpenProcess(0x00000010, false, mainGameProcess.Id);
             SendStatusLogMessage($"{runtimeSettings.DisplayName} process handle: {gameProcessHandle}");
             PostAttachToGameSetup();
             BeginGameStateTimer();
@@ -433,12 +468,24 @@ namespace CMI
         {
             gameStateTimer.Tick += (s, e) =>
             {
-                if (soundEventFadeTimer.Enabled) return;
-                if (gameDataMan == 0 && gameDataManLookupAvailable) SetGameDataMan();
-                UpdateGameState();
-                if (!mainGameProcess.HasExited) return;
-                if (runtimeSettings.UsesNativeFlagBridge) NightreignFlagBridge.Close();
-                Environment.Exit(0);
+                try
+                {
+                    if (IsGameProcessExited())
+                    {
+                        if (runtimeSettings.UsesNativeFlagBridge) NightreignFlagBridge.Close();
+                        Environment.Exit(0);
+                    }
+                    if (soundEventFadeTimer.Enabled) return;
+                    if (gameDataMan == 0 && gameDataManLookupAvailable) SetGameDataMan();
+                    UpdateGameState();
+                    if (!IsGameProcessExited()) return;
+                    if (runtimeSettings.UsesNativeFlagBridge) NightreignFlagBridge.Close();
+                    Environment.Exit(0);
+                }
+                catch (Exception ex)
+                {
+                    LogAndExit("CMI game-state timer failed", ex);
+                }
             };
             // TODO: Double check
             // gameStateTimer.Interval = 10;
@@ -501,6 +548,7 @@ namespace CMI
 
         private static void RunApplication(string appRootOverride)
         {
+            ConfigureUnhandledExceptionHandlers();
             try
             {
                 string location = Assembly.GetExecutingAssembly().Location;
@@ -511,15 +559,59 @@ namespace CMI
                 modSoundFolderPath = Path.Combine(appRootPath, runtimeSettings.SoundFolder);
                 soundJsonFilePath = Path.Combine(appRootPath, runtimeSettings.SoundJson);
             }
-            catch
+            catch (Exception ex)
             {
+                LogFatalException("CMI configuration failed", ex);
                 Environment.Exit(0);
             }
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-            // TODO: Figure out what's causing the textbox dispose exception...
-            cmi = new CMI();
-            Application.Run(cmi);
+            try
+            {
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
+                // TODO: Figure out what's causing the textbox dispose exception...
+                cmi = new CMI();
+                Application.Run(cmi);
+            }
+            catch (Exception ex)
+            {
+                LogAndExit("CMI application failed", ex);
+            }
+        }
+
+        private static void ConfigureUnhandledExceptionHandlers()
+        {
+            Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+            Application.ThreadException += (sender, args) => LogAndExit("CMI UI thread failed", args.Exception);
+            AppDomain.CurrentDomain.UnhandledException += (sender, args) =>
+                LogAndExit("CMI app domain failed", args.ExceptionObject as Exception);
+            TaskScheduler.UnobservedTaskException += (sender, args) =>
+            {
+                args.SetObserved();
+                LogAndExit("CMI task failed", args.Exception);
+            };
+        }
+
+        private static void LogAndExit(string source, Exception ex)
+        {
+            if (Interlocked.Exchange(ref fatalExitStarted, 1) == 0) LogFatalException(source, ex);
+            Environment.Exit(0);
+        }
+
+        private static void LogFatalException(string source, Exception ex)
+        {
+            try
+            {
+                string basePath = string.IsNullOrWhiteSpace(appRootPath)
+                    ? AppDomain.CurrentDomain.BaseDirectory
+                    : appRootPath;
+                string logPath = Path.Combine(basePath, "cmi_error.log");
+                File.AppendAllText(logPath,
+                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {source}{Environment.NewLine}{ex}{Environment.NewLine}{Environment.NewLine}");
+            }
+            catch
+            {
+                // Last-resort handler; packaged CMI should fail closed rather than show .NET dialogs.
+            }
         }
 
         /*
