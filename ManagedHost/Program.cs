@@ -11,22 +11,27 @@ namespace CMI.Host
         [STAThread]
         private static void Main()
         {
-            using (new Mutex(true, BuildMutexName(), out bool createdNew))
+            try
             {
-                if (!createdNew) return;
-
-                try
+                using (Mutex mutex = new Mutex(true, BuildMutexName(), out bool createdNew))
                 {
+                    if (!createdNew) return;
+
                     global::CMI.CMI.Main();
                 }
-                catch (Exception ex)
-                {
-                    MessageBox.Show(
-                        ex.ToString(),
-                        "CMI Nightreign Host",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Error);
-                }
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // A previous elevated/session-mismatched host can leave a named mutex
+                // that this process cannot open. Treat it as "already running".
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    ex.ToString(),
+                    "CMI Host",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
             }
         }
 
@@ -36,7 +41,7 @@ namespace CMI.Host
             using (MD5 md5 = MD5.Create())
             {
                 byte[] hash = md5.ComputeHash(Encoding.UTF8.GetBytes(baseDirectory.ToLowerInvariant()));
-                return "Global\\CMI_Host_" + BitConverter.ToString(hash).Replace("-", string.Empty);
+                return "Local\\CMI_Host_" + BitConverter.ToString(hash).Replace("-", string.Empty);
             }
         }
     }
