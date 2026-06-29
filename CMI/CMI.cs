@@ -162,9 +162,18 @@ namespace CMI
 
         private static Scanner ConfigureMemoryScanner(string searchQuery)
         {
-            Scanner memoryScanner = new Scanner(mainGameProcess, gameProcessHandle, searchQuery);
-            memoryScanner.setModule(mainGameProcess.MainModule);
-            return memoryScanner;
+            try
+            {
+                Scanner memoryScanner = new Scanner(mainGameProcess, gameProcessHandle, searchQuery);
+                ProcessModule mainModule = mainGameProcess.MainModule;
+                if (mainModule == null) return null;
+                memoryScanner.setModule(mainModule);
+                return memoryScanner;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         private static void ConfigureMemoryScanners()
@@ -242,6 +251,14 @@ namespace CMI
             }
 
             ConfigureMemoryScanners();
+            if (eventFlagManScanner == null && gameDataManScanner == null && worldChrManScanner == null)
+            {
+                legacySignatureScanningEnabled = false;
+                gameDataManLookupAvailable = false;
+                SendStatusLogMessage("Legacy memory signature scanning could not access the game process. Continuing without legacy pointer reads.");
+                return false;
+            }
+
             bool eventFlagReady = SetEventFlagMan();
             bool worldChrReady = SetWorldChrMan();
             bool gameDataReady = SetGameDataMan();
@@ -438,9 +455,17 @@ namespace CMI
 #if HIDE_WINDOW
     Hide();
 #endif
-            if (!ReadSoundJSON()) return;
-            LoadSoundEvents();
-            await AttachToGame();
+            try
+            {
+                if (!ReadSoundJSON()) return;
+                LoadSoundEvents();
+                await AttachToGame();
+            }
+            catch (Exception ex)
+            {
+                SendStatusLogMessage($"CMI startup failed: {ex.Message}");
+                Environment.Exit(0);
+            }
         }
 
         private void SoundEventsListBox_AfterSelect(object sender, TreeViewEventArgs e)
