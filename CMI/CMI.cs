@@ -48,6 +48,7 @@ namespace CMI
         private static bool gameDataManLookupAvailable;
         private static bool nativeStarted;
         private static int fatalExitStarted;
+        private static string lastActivatedEventSummary;
         private static readonly object nativeStartLock = new object();
         public static readonly List<SoundEvent> soundEvents = new List<SoundEvent>();
         private static readonly MediaPlayer musicMediaPlayer = new MediaPlayer(0, true, 0);
@@ -149,11 +150,28 @@ namespace CMI
 
         private void SendStatusLogMessage(string message)
         {
+            WriteRuntimeLog(message);
             int messageIndex = statusLogTextBox.Text.LastIndexOf(message, StringComparison.Ordinal);
             if (messageIndex == statusLogTextBox.TextLength - message.Length - 2) return;
             statusLogTextBox.AppendText($"{message}\r\n");
             statusLogTextBox.SelectionStart = statusLogTextBox.TextLength;
             statusLogTextBox.ScrollToCaret();
+        }
+
+        private static void WriteRuntimeLog(string message)
+        {
+            try
+            {
+                string basePath = string.IsNullOrWhiteSpace(appRootPath)
+                    ? AppDomain.CurrentDomain.BaseDirectory
+                    : appRootPath;
+                string logPath = Path.Combine(basePath, "cmi_runtime.log");
+                File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}{Environment.NewLine}");
+            }
+            catch
+            {
+                // Runtime logging must never affect playback.
+            }
         }
 
         private static Process[] GetGameProcesses()
@@ -282,6 +300,12 @@ namespace CMI
             bool eventFlagReady = SetEventFlagMan();
             bool worldChrReady = SetWorldChrMan();
             bool gameDataReady = SetGameDataMan();
+            if (eventFlagReady)
+                SendStatusLogMessage("EventFlagMan signature found. Legacy pointer events are available.");
+            if (worldChrReady)
+                SendStatusLogMessage("WorldChrMan signature found. HP/death guards are available.");
+            if (gameDataReady)
+                SendStatusLogMessage("GameDataMan signature found. Game volume reads are available.");
             if (!eventFlagReady)
                 SendStatusLogMessage("EventFlagMan signature not found. EventFlagId and legacy pointer events will stay inactive.");
             if (!worldChrReady)
@@ -368,6 +392,10 @@ namespace CMI
                 try
                 {
                     currentVolume = ReadVolume(gameDataMan, valueOffset);
+                    if (currentVolume <= 0)
+                    {
+                        currentVolume = savedVolume == -1 ? 100 : savedVolume;
+                    }
                 }
                 catch
                 {
@@ -380,9 +408,11 @@ namespace CMI
                 currentVolume = (int)(currentVolume * (gameWinVolume / 100.0));
                 currentVolume = (int)((double)currentVolume / 100 * masterVolume / 100 * 100);
                 soundEvent.MediaPlayer.Volume = currentVolume;
+                soundEvent.SetBackendVolume(currentVolume);
             }
             if (savedVolume == -1 && soundEvent != null) savedVolume = soundEvent.Volume;
             if (currentVolume == savedVolume) return currentVolume;
+            if (soundEvent != null) return currentVolume;
             string volumeHost = soundEvent == null ? "Master" : soundEvent.Name;
             SendStatusLogMessage($"{volumeHost} volume changed to {currentVolume}%");
             return currentVolume;
@@ -390,24 +420,45 @@ namespace CMI
 
         private int GetGameWinVolume()
         {
-            if (!audioSessionInitialized) InitializeAudioSession();
-            if (gameAudioSession == null) return 100;
-            return (int)(gameAudioSession.SimpleAudioVolume.Volume * 100);
+            try
+            {
+                if (!audioSessionInitialized) InitializeAudioSession();
+                if (gameAudioSession == null) return 100;
+                return (int)(gameAudioSession.SimpleAudioVolume.Volume * 100);
+            }
+            catch
+            {
+                audioSessionInitialized = false;
+                gameAudioSession = null;
+                return 100;
+            }
         }
 
         private void InitializeAudioSession()
         {
-            MMDeviceEnumerator enumerator = new MMDeviceEnumerator();
-            MMDevice defaultDevice = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
-            AudioSessionManager sessionManager = defaultDevice.AudioSessionManager;
-            for (int i = 0; i < sessionManager.Sessions.Count; i++)
+            try
             {
-                AudioSessionControl session = sessionManager.Sessions[i];
-                uint process = session.GetProcessID;
-                if (process != mainGameProcess.Id) continue;
-                audioSessionInitialized = true;
-                gameAudioSession = session;
-                break;
+                if (IsGameProcessExited()) return;
+                int gameProcessId = mainGameProcess.Id;
+                MMDeviceEnumerator enumerator = new MMDeviceEnumerator();
+                MMDevice defaultDevice = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+                AudioSessionManager sessionManager = defaultDevice?.AudioSessionManager;
+                if (sessionManager == null) return;
+                for (int i = 0; i < sessionManager.Sessions.Count; i++)
+                {
+                    AudioSessionControl session = sessionManager.Sessions[i];
+                    if (session == null) continue;
+                    uint process = session.GetProcessID;
+                    if (process != gameProcessId) continue;
+                    audioSessionInitialized = true;
+                    gameAudioSession = session;
+                    break;
+                }
+            }
+            catch
+            {
+                audioSessionInitialized = false;
+                gameAudioSession = null;
             }
         }
 
@@ -449,6 +500,13 @@ namespace CMI
             {
                 soundEvent.Activated = soundEvent.IsActivated();
                 soundEvent.SetEventNodeIcon(soundEvent.Activated ? 2 : 1);
+            }
+            string activatedEventSummary = string.Join(", ", soundEvents.Where(i => i.Activated).Select(i => i.Name).Take(8));
+            if (string.IsNullOrWhiteSpace(activatedEventSummary)) activatedEventSummary = "none";
+            if (activatedEventSummary != lastActivatedEventSummary)
+            {
+                lastActivatedEventSummary = activatedEventSummary;
+                SendStatusLogMessage($"Active sound events: {activatedEventSummary}");
             }
             foreach (SoundEvent soundEvent in soundEvents)
             {
@@ -699,6 +757,12 @@ namespace CMI
             public bool Loop { get; set; }
             private readonly Timer fadeStopTimer = new Timer();
             private bool stopRequested;
+            private bool playRequested;
+            private bool UsesDirectActivation => AlwaysActive || EventFlagId.HasValue;
+            private bool UsesLowLatencyBackend => Type == 4;
+            private bool IsBackendCurrent => UsesLowLatencyBackend
+                && string.Equals(LowLatencyMusicBackend.CurrentSong, SoundPath, StringComparison.OrdinalIgnoreCase);
+            private bool IsCurrentSong => MediaPlayer.CurrentSong == SoundPath || IsBackendCurrent;
 
             // TODO: Create a strings class for sound event property keys...
 
@@ -771,32 +835,42 @@ namespace CMI
 
             public bool ShouldStopEvent()
             {
-                return cooldownTimer.Enabled
-                    || !MediaPlayer.inFade && IsHPZero()
+                bool isCurrentOrPending = playRequested || stopRequested || IsCurrentSong;
+                if (!isCurrentOrPending) return false;
+                return !MediaPlayer.inFade && IsHPZero()
                     || IsHPInvalid()
-                    || !Activated && MediaPlayer.CurrentSong == SoundPath && !stopRequested;
+                    || !Activated && IsCurrentSong && !stopRequested;
             }
 
             public bool ShouldPlayEvent()
             {
-                return !IsHPZero()
-                    && !IsHPInvalid()
+                bool useHpGuard = !UsesDirectActivation;
+                return (!useHpGuard || !IsHPZero())
+                    && (!useHpGuard || !IsHPInvalid())
                     && Activated
                     && !DoesOtherEventOverride()
-                    && (MediaPlayer.CurrentSong != SoundPath || stopRequested);
+                    && ((!playRequested && !IsCurrentSong) || stopRequested);
+            }
+
+            public void SetBackendVolume(int currentVolume)
+            {
+                if (!UsesLowLatencyBackend) return;
+                LowLatencyMusicBackend.SetVolume(SoundPath, currentVolume);
             }
 
             public void StopEvent()
             {
                 bool isHPZero = IsHPZero();
-                if (!cooldownTimer.Enabled && !IsHPInvalid() && !isHPZero && FadeIntoNextTrack) return;
-                bool shouldStopImmediately = cooldownTimer.Enabled || IsHPInvalid() || !isHPZero && FadeOutSeconds == 0;
+                bool isHPInvalid = IsHPInvalid();
+                if (!isHPInvalid && !isHPZero && FadeIntoNextTrack) return;
+                bool shouldStopImmediately = isHPInvalid || !isHPZero && FadeOutSeconds == 0;
                 if (stopRequested && !shouldStopImmediately) return;
                 stopRequested = true;
+                WriteRuntimeLog($"Stopping event {Name}: immediate={shouldStopImmediately}, hpZero={isHPZero}, hpInvalid={isHPInvalid}, activated={Activated}, fadeIntoNext={FadeIntoNextTrack}, fadeOut={FadeOutSeconds}, playRequested={playRequested}");
                 if (shouldStopImmediately)
                 {
                     CompleteStop();
-                    if (cooldownTimer.Enabled || !IsHPInvalid()) return;
+                    if (!isHPInvalid) return;
                     cooldownTimer.Interval = 10000;
                     cooldownTimer.AutoReset = false;
                     cooldownTimer.Start();
@@ -817,13 +891,29 @@ namespace CMI
 
             public void PlayEvent()
             {
+                if (playRequested || IsCurrentSong)
+                {
+                    CancelPendingStop();
+                    playRequested = true;
+                    WriteRuntimeLog($"Keeping event {Name}: {SoundPath}");
+                    return;
+                }
+
                 CancelPendingStop();
+                playRequested = true;
                 MediaPlayer.Player1.settings.setMode("loop", Loop);
                 MediaPlayer.Player2.settings.setMode("loop", Loop);
+                if (UsesLowLatencyBackend)
+                {
+                    bool lowLatencyAccepted = LowLatencyMusicBackend.Play(SoundPath, Loop, Volume);
+                    WriteRuntimeLog($"Playing event {Name} with low-latency backend: {SoundPath} (accepted={lowLatencyAccepted})");
+                    if (lowLatencyAccepted) return;
+                }
                 MediaPlayer.Crossfade = true;
                 MediaPlayer.FadeTime = FadeInSeconds;
                 MediaPlayer.CrossfadeTime = FadeInSeconds;
-                MediaPlayer.Play(SoundPath, FadeInSeconds > 0);
+                bool accepted = MediaPlayer.Play(SoundPath, FadeInSeconds > 0);
+                WriteRuntimeLog($"Playing event {Name}: {SoundPath} (accepted={accepted})");
                 // TODO: We also need to correctly set the UI player position...
             }
 
@@ -848,7 +938,13 @@ namespace CMI
                     MediaPlayer.CurrentSong = null;
                     MediaPlayer.Stop(false);
                 }
+                if (UsesLowLatencyBackend)
+                {
+                    LowLatencyMusicBackend.Stop(SoundPath);
+                }
+                WriteRuntimeLog($"Completed stop event {Name}: stopRequested={stopRequested}, playRequested={playRequested}");
                 stopRequested = false;
+                playRequested = false;
             }
 
             private MediaPlayer GetMediaPlayer()

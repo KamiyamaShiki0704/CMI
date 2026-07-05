@@ -98,6 +98,7 @@
       <DependentUpon>CMI.cs</DependentUpon>
     </Compile>
     <Compile Include="JObjectExtensions.cs" />
+    <Compile Include="LowLatencyMusicBackend.cs" />
     <Compile Include="Media Player.cs" />
     <Compile Include="NightreignFlagBridge.cs" />
     <Compile Include="RuntimeSettings.cs" />

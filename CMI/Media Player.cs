@@ -555,8 +555,10 @@ namespace ECN.MediaPlayer
                         Player1Song = TheSong;
                         Player1.URL = TheSong;
                         Player1.volume = 0;
+                        Player1.play();
                         FadeState = FadeStates.In;
                         StartFade();
+                        return true;
                     }
                     else
                     {
@@ -835,11 +837,9 @@ namespace ECN.MediaPlayer
                         {
                             case Players.Player1:
                                 Player1.volume = 0;
-                                Player1.play();
                                 break;
                             case Players.Player2:
                                 Player2.volume = 0;
-                                Player2.play();
                                 break;
                         }
                     }
