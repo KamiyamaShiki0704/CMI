@@ -392,10 +392,6 @@ namespace CMI
                 try
                 {
                     currentVolume = ReadVolume(gameDataMan, valueOffset);
-                    if (currentVolume <= 0)
-                    {
-                        currentVolume = savedVolume == -1 ? 100 : savedVolume;
-                    }
                 }
                 catch
                 {
@@ -616,6 +612,11 @@ namespace CMI
                 runtimeSettings = RuntimeSettings.Load(appRootPath);
                 modSoundFolderPath = Path.Combine(appRootPath, runtimeSettings.SoundFolder);
                 soundJsonFilePath = Path.Combine(appRootPath, runtimeSettings.SoundJson);
+                if (runtimeSettings.StartDelayMs > 0)
+                {
+                    WriteRuntimeLog($"Delaying CMI startup by {runtimeSettings.StartDelayMs} ms.");
+                    Thread.Sleep(runtimeSettings.StartDelayMs);
+                }
             }
             catch (Exception ex)
             {

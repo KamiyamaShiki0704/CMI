@@ -148,6 +148,7 @@ Common settings:
   "SoundFolder": "sound",
   "SoundJson": "sound.json",
   "EventFlagIdReader": "NativeBridge",
+  "StartDelayMs": 5000,
   "Memory": {
     "EnableLegacySignatureScanning": true
   }
@@ -155,6 +156,7 @@ Common settings:
 ```
 
 Use `ProcessName: "nightreign"` and `DisplayName: "ELDEN RING NIGHTREIGN"` for Nightreign.
+Set `StartDelayMs` to delay CMI initialization after the host starts; `5000` waits five seconds, while missing or `0` starts immediately.
 
 ## Building
 

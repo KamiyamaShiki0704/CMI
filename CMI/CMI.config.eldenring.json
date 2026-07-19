@@ -4,6 +4,7 @@
   "SoundFolder": "sound",
   "SoundJson": "sound.json",
   "EventFlagIdReader": "NativeBridge",
+  "StartDelayMs": 5000,
   "Memory": {
     "EnableLegacySignatureScanning": true,
     "EventFlagManQuery": null,

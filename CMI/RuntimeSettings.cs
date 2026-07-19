@@ -11,6 +11,7 @@ namespace CMI
         public string SoundFolder { get; set; } = "sound";
         public string SoundJson { get; set; } = "sound.json";
         public string EventFlagIdReader { get; set; } = "NativeBridge";
+        public int StartDelayMs { get; set; } = 0;
         public MemorySettings Memory { get; set; } = new MemorySettings();
 
         public static RuntimeSettings Load(string appRootPath)
@@ -48,6 +49,7 @@ namespace CMI
             if (string.IsNullOrWhiteSpace(SoundFolder)) SoundFolder = "sound";
             if (string.IsNullOrWhiteSpace(SoundJson)) SoundJson = "sound.json";
             if (string.IsNullOrWhiteSpace(EventFlagIdReader)) EventFlagIdReader = "NativeBridge";
+            if (StartDelayMs < 0) StartDelayMs = 0;
             Memory = Memory ?? new MemorySettings();
         }
 
